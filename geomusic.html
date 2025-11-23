@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Geometric Music Builder</title>
+  <!-- p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- Tone.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #controls {
+      width: 280px;
+      min-width: 240px;
+      background: #1a1a1a;
+      padding: 12px;
+      box-sizing: border-box;
+      border-right: 1px solid #333;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #controls h2, #controls h3, #controls h4 {
+      margin: 8px 0;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    #controls h2 {
+      font-size: 20px;
+    }
+    #controls label {
+      display: block;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    #controls select, #controls input, #controls button {
+      width: 100%;
+      margin-top: 6px;
+      background: #222;
+      color: #eee;
+      border: 1px solid #ffb000; /* theme orange */
+      padding: 10px 8px;
+      font-size: 14px;
+      border-radius: 4px;
+      box-sizing: border-box;
+      min-height: 44px;
+      -webkit-appearance: none;
+      appearance: none;
+      pointer-events: auto;
+      touch-action: manipulation;
+    }
+    #nodeControls select {
+      margin-bottom: 4px;
+    }
+    #canvas-container {
+      flex: 1;
+    }
+    button {
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      pointer-events: auto;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    button:active {
+      opacity: 0.8;
+      transform: scale(0.98);
+    }
+    .inline-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .inline-buttons button {
+      flex: 1;
+      min-height: 44px;
+    }
+    small {
+      color: #ffb000;
+      font-size: 12px;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .row > * {
+      flex: 1;
+    }
+    .node-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 4px;
+    }
+    #canvas-container {
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    input[type="range"] {
+      min-height: 44px;
+      padding: 0;
+    }
+    input[type="number"] {
+      min-height: 44px;
+    }
+    input[type="color"] {
+      min-height: 44px;
+      min-width: 60px;
+      cursor: pointer;
+    }
+    #audioUnlockOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      font-size: 24px;
+      text-align: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    #audioUnlockOverlay.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="audioUnlockOverlay">
+    Tap to Enable Audio
+  </div>
+  <div id="controls">
+    <h2>Geo-Music</h2>
+    <button id="playPauseBtn">Start Audio / Play</button>
+    <small>Audio needs a click to start.</small>
+
+    <h3>Scale</h3>
+    <label for="rootNoteSelect">Root Note</label>
+    <select id="rootNoteSelect">
+      <option value="C">C</option>
+      <option value="C#">C#</option>
+      <option value="D">D</option>
+      <option value="D#">D#</option>
+      <option value="E">E</option>
+      <option value="F">F</option>
+      <option value="F#">F#</option>
+      <option value="G">G</option>
+      <option value="G#">G#</option>
+      <option value="A">A</option>
+      <option value="A#">A#</option>
+      <option value="B">B</option>
+    </select>
+    <label for="scaleSelect">Scale Type</label>
+    <select id="scaleSelect">
+      <option value="major">Major</option>
+      <option value="minor">Minor (Natural)</option>
+      <option value="pentatonic">Pentatonic Major</option>
+      <option value="pentatonicMinor">Pentatonic Minor</option>
+      <option value="dorian">Dorian</option>
+      <option value="mixolydian">Mixolydian</option>
+      <option value="chromatic">Chromatic (All Notes)</option>
+    </select>
+    <small>Only scale notes will be available</small>
+
+    <h3>Rings</h3>
+    <div class="inline-buttons">
+      <button id="addRingBtn">Add Ring</button>
+      <button id="removeRingBtn">Remove</button>
+    </div>
+    <label for="ringSelect">Select Ring</label>
+    <select id="ringSelect"></select>
+
+    <h4>Ring Settings</h4>
+    <label for="ringTypeSelect">Type</label>
+    <select id="ringTypeSelect">
+      <option value="circle">Circle</option>
+      <option value="polygon">Polygon</option>
+    </select>
+
+    <label for="speedRange">BPM</label>
+    <div class="row">
+      <input id="speedRange" type="range" min="20" max="300" step="1" value="120" />
+      <input id="bpmInput" type="number" min="20" max="300" value="120" />
+    </div>
+
+    <label for="nodeCountInput">Number of nodes</label>
+    <input id="nodeCountInput" type="number" min="1" max="16" value="4" />
+
+    <label for="instrumentSelect">Instrument</label>
+    <select id="instrumentSelect">
+      <option value="Synth">Synth</option>
+      <option value="AMSynth">AMSynth</option>
+      <option value="FMSynth">FMSynth</option>
+      <option value="MonoSynth">MonoSynth</option>
+    </select>
+
+    <h4>Node Notes</h4>
+    <small>Change notes per node</small>
+    <div id="nodeControls"></div>
+
+    <h4>Timing</h4>
+    <div class="inline-buttons">
+      <button id="syncBtn">Sync</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <h4>Export</h4>
+    <button id="exportBtn">Export 4-Bar Loop</button>
+    <small>Records 4 bars as WAV file</small>
+  </div>
+  <div id="canvas-container"></div>
+
+  <script>
+    // -----------------------
+    // GLOBALS
+    // -----------------------
+    let rings = [];
+    const maxRings = 5;
+    let selectedRingIndex = 0;
+    let isPlaying = false;
+
+    const defaultScale = ["C4","D4","E4","G4","A4","C5","D5","E5"];
+    const allNotes = [
+      "C3","C#3","D3","D#3","E3","F3","F#3","G3","G#3","A3","A#3","B3",
+      "C4","C#4","D4","D#4","E4","F4","F#4","G4","G#4","A4","A#4","B4",
+      "C5","C#5","D5","D#5","E5","F5","F#5","G5","G#5","A5","A#5","B5"
+    ];
+
+    // Scale definitions (intervals in semitones from root)
+    const scalePatterns = {
+      major: [0, 2, 4, 5, 7, 9, 11],
+      minor: [0, 2, 3, 5, 7, 8, 10],
+      pentatonic: [0, 2, 4, 7, 9],
+      pentatonicMinor: [0, 3, 5, 7, 10],
+      dorian: [0, 2, 3, 5, 7, 9, 10],
+      mixolydian: [0, 2, 4, 5, 7, 9, 10],
+      chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    };
+
+    // Note names in order (C to B)
+    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    
+    // Current scale settings
+    let currentRootNote = "C";
+    let currentScaleType = "major";
+    let availableScaleNotes = [];
+
+    // Function to get note name from semitone offset from C
+    function getNoteName(semitoneOffset) {
+      return noteNames[semitoneOffset % 12];
+    }
+
+    // Function to get semitone offset of a root note (C=0, C#=1, D=2, etc.)
+    function getRootSemitone(rootNote) {
+      return noteNames.indexOf(rootNote);
+    }
+
+    // Function to generate all notes in the selected scale across multiple octaves
+    function generateScaleNotes(rootNote, scaleType) {
+      const rootSemitone = getRootSemitone(rootNote);
+      const pattern = scalePatterns[scaleType] || scalePatterns.major;
+      const notes = [];
+      
+      // Generate notes across octaves 3, 4, and 5
+      for (let octave = 3; octave <= 5; octave++) {
+        pattern.forEach(interval => {
+          const semitone = rootSemitone + interval;
+          const noteName = getNoteName(semitone);
+          const fullNote = noteName + octave;
+          notes.push(fullNote);
+        });
+      }
+      
+      return notes.sort((a, b) => {
+        // Sort by octave first, then by note name
+        const octaveA = parseInt(a.match(/\d+/)[0]);
+        const octaveB = parseInt(b.match(/\d+/)[0]);
+        if (octaveA !== octaveB) return octaveA - octaveB;
+        const noteA = a.replace(/\d+/, '');
+        const noteB = b.replace(/\d+/, '');
+        return getRootSemitone(noteA) - getRootSemitone(noteB);
+      });
+    }
+
+    // Initialize scale notes
+    availableScaleNotes = generateScaleNotes(currentRootNote, currentScaleType);
+
+    // Mathematical constant (p5.js uses this but it's not global in instance mode)
+    const TWO_PI = 2 * Math.PI;
+    const themeColor = '#ffb000';
+    let currentBpm = 120; // global default; rings now have their own bpm
+    const hasTone = typeof Tone !== "undefined";
+    const instrumentPool = {};
+
+    // iOS Safari detection and initialization fix
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isFileProtocol = window.location.protocol === 'file:';
+
+    // iOS fix: Unlock interactions on first touch
+    if (isIOS) {
+      document.addEventListener('touchstart', function unlock() {
+        document.removeEventListener('touchstart', unlock);
+        // Force enable all interactions
+        document.body.style.pointerEvents = 'auto';
+        // Ensure all interactive elements are enabled
+        document.querySelectorAll('button, select, input').forEach(el => {
+          el.style.pointerEvents = 'auto';
+          el.style.touchAction = 'manipulation';
+        });
+      }, { once: true, passive: true });
+    }
+
+    // -----------------------
+    // POSITIONING HELPER
+    // -----------------------
+    function calculateRingPosition(index, centerX, centerY) {
+      // Pattern: Ring 1 (index 0) = center, Ring 2 = right, Ring 3 = left, Ring 4 = right of ring 2, etc.
+      const offset = 260; // Distance between rings (radius * 2 + gap)
+      
+      if (index === 0) {
+        // First ring in center
+        return { x: centerX, y: centerY };
+      }
+      
+      // For rings after the first:
+      // Odd indices (1, 3, 5...) go right (positive X)
+      // Even indices (2, 4, 6...) go left (negative X)
+      // Distance increases: ring 2/3 = 1*offset, ring 4/5 = 2*offset, etc.
+      const side = (index % 2 === 1) ? 1 : -1; // 1 = right, -1 = left
+      const distance = Math.ceil(index / 2) * offset;
+      
+      return {
+        x: centerX + (side * distance),
+        y: centerY
+      };
+    }
+
+    // -----------------------
+    // AUDIO HELPERS
+    // -----------------------
+    function createInstrument(type) {
+      if (!hasTone) {
+        return { triggerAttackRelease: () => {} };
+      }
+      if (!instrumentPool[type]) {
+        let inst;
+        switch (type) {
+          case "AMSynth":
+            inst = new Tone.AMSynth().toDestination();
+            break;
+          case "FMSynth":
+            inst = new Tone.FMSynth().toDestination();
+            break;
+          case "MonoSynth":
+            inst = new Tone.MonoSynth().toDestination();
+            break;
+          default:
+            inst = new Tone.Synth().toDestination();
+            break;
+        }
+        instrumentPool[type] = inst;
+      }
+      return instrumentPool[type];
+    }
+
+    // -----------------------
+    // NODE CLASS (simple object in practice)
+    // -----------------------
+    class GeoNode {
+      constructor(angle, note) {
+        this.angle = angle;     // angle position on ring
+        this.note = note;
+        this.justTriggered = false;  // for visual flash
+        this.triggerCooldown = 0;    // frames to stay bright (legacy)
+        this.passedTrigger = false;  // to avoid re-triggering in same pass
+        this.pulseRemaining = 0;     // seconds remaining for pulse animation
+        this.setColor(themeColor);     // per-node color
+      }
+      setColor(col) {
+        this.color = col;
+        if (col && col[0] === '#' && col.length === 7) {
+          this.colorRGB = {
+            r: parseInt(col.slice(1,3), 16),
+            g: parseInt(col.slice(3,5), 16),
+            b: parseInt(col.slice(5,7), 16)
+          };
+        } else {
+          this.colorRGB = { r: 255, g: 176, b: 0 };
+        }
+      }
+    }
+
+    // -----------------------
+    // RING CLASS
+    // -----------------------
+    class Ring {
+      constructor(x, y, radius, type="circle") {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.type = type;           // "circle" or "polygon"
+        this.speed = 0.02;          // rotation speed
+        this.rotation = 0;          // current rotation
+        this.lastRotation = 0;
+        this.nodes = [];
+        this.instrumentType = "Synth";
+        this.instrument = createInstrument(this.instrumentType);
+        this.sides = 6;             // for polygon drawing, fixed
+        this.bpm = 120;             // per-ring BPM
+      }
+
+      setNodeCount(count) {
+        this.nodes = [];
+        for (let i = 0; i < count; i++) {
+          // First node at top (-PI/2), then proceed clockwise
+          const angle = -Math.PI/2 + (i / count) * TWO_PI;
+          // Use notes from current scale if available, otherwise fall back to defaultScale
+          const note = (availableScaleNotes && availableScaleNotes.length > 0) 
+            ? availableScaleNotes[i % availableScaleNotes.length]
+            : defaultScale[i % defaultScale.length];
+          this.nodes.push(new GeoNode(angle, note));
+        }
+      }
+
+      setInstrument(type) {
+        this.instrumentType = type;
+        this.instrument = createInstrument(type);
+      }
+
+      update(deltaSeconds) {
+        this.lastRotation = this.rotation;
+        // BPM-based angular velocity: full rotation per beat, per-ring
+        const angularVelocity = TWO_PI * ((this.bpm || 120) / 60);
+        this.rotation += angularVelocity * (deltaSeconds || 0);
+        // keep rotation in range
+        if (this.rotation > TWO_PI) this.rotation -= TWO_PI;
+
+        // decrease pulse timers for nodes
+        this.nodes.forEach(n => {
+          if (n.pulseRemaining > 0) {
+            n.pulseRemaining -= (deltaSeconds || 0);
+            if (n.pulseRemaining <= 0) {
+              n.pulseRemaining = 0;
+              n.justTriggered = false;
+            }
+          } else {
+            n.justTriggered = false;
+          }
+        });
+      }
+
+      draw(p) {
+        p.push();
+        p.translate(this.x, this.y);
+        // Ring stays stationary - no rotation applied here
+
+        // draw main ring
+        p.stroke(themeColor);
+        p.noFill();
+        p.strokeWeight(2);
+        if (this.type === "circle") {
+          p.circle(0, 0, this.radius * 2);
+        } else {
+          p.beginShape();
+          for (let i = 0; i < this.sides; i++) {
+            const a = (i / this.sides) * TWO_PI;
+            const vx = Math.cos(a) * this.radius;
+            const vy = Math.sin(a) * this.radius;
+            p.vertex(vx, vy);
+          }
+          p.endShape(p.CLOSE);
+        }
+
+        // draw nodes (stationary on ring) with pulse
+        for (let idx = 0; idx < this.nodes.length; idx++) {
+          const node = this.nodes[idx];
+          const nx = Math.cos(node.angle) * this.radius;
+          const ny = Math.sin(node.angle) * this.radius;
+          const baseSize = 10;
+          let size = baseSize;
+          if (node.pulseRemaining > 0) {
+            const T = 0.18; // seconds
+            const phase = 1 - Math.min(node.pulseRemaining / T, 1);
+            size = baseSize * (1 + 0.6 * Math.sin(phase * Math.PI));
+          }
+          const { r, g, b } = node.colorRGB || { r: 255, g: 176, b: 0 };
+          p.fill(r, g, b);
+          p.stroke(r, g, b);
+          p.circle(nx, ny, size);
+
+          // draw node index label
+          p.noStroke();
+          p.fill(255);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.textSize(10);
+          p.text(String(idx + 1), nx, ny - 14);
+          // restore stroke for next elements
+          p.stroke(r, g, b);
+        }
+
+        // draw trigger line (rotating at this.rotation angle)
+        p.stroke(parseInt(themeColor.slice(1,3),16), parseInt(themeColor.slice(3,5),16), parseInt(themeColor.slice(5,7),16));
+        const lineEndX = Math.cos(this.rotation) * this.radius;
+        const lineEndY = Math.sin(this.rotation) * this.radius;
+        p.line(0, 0, lineEndX, lineEndY);
+
+        p.pop();
+      }
+
+      // Swept-angle trigger detection
+      checkTriggers() {
+        const prev = (this.lastRotation % TWO_PI + TWO_PI) % TWO_PI;
+        const curr = (this.rotation % TWO_PI + TWO_PI) % TWO_PI;
+        const wrapped = curr < prev;
+        for (let node of this.nodes) {
+          const a = (node.angle % TWO_PI + TWO_PI) % TWO_PI;
+          let crossed = false;
+          if (!wrapped) {
+            crossed = a >= prev && a <= curr;
+          } else {
+            crossed = a >= prev || a <= curr;
+          }
+          if (crossed) {
+            if (!node.passedTrigger) {
+              this.playNode(node);
+              node.passedTrigger = true;
+            }
+          } else {
+            node.passedTrigger = false;
+          }
+        }
+      }
+
+      playNode(node) {
+        if (!isPlaying) return;
+        if (this.instrument && node.note) {
+          if (hasTone) {
+            const now = Tone.now();
+            this.instrument.triggerAttackRelease(node.note, "8n", now + 0.03);
+          }
+          node.justTriggered = true;
+          node.pulseRemaining = 0.18;
+        }
+      }
+    }
+
+    // -----------------------
+    // P5 SETUP & DRAW
+    // -----------------------
+    let p5instance;
+    new p5((p) => {
+      p.setup = () => {
+        // Ensure valid canvas dimensions
+        const canvasWidth = Math.max(window.innerWidth - 280, 400);
+        const canvasHeight = Math.max(window.innerHeight, 300);
+        
+        const canvas = p.createCanvas(canvasWidth, canvasHeight);
+        canvas.parent("canvas-container");
+        
+        // Improved touch handling for iOS
+        const canvasElement = canvas.elt;
+        canvasElement.style.touchAction = 'none';
+        canvasElement.style.webkitTouchCallout = 'none';
+        canvasElement.style.userSelect = 'none';
+
+        // Enhanced touch event handlers for iOS compatibility
+        canvasElement.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Force p5.js to recognize touch on iOS
+          if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            const rect = canvasElement.getBoundingClientRect();
+            const scaleX = canvasElement.width / rect.width;
+            const scaleY = canvasElement.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            
+            // Manually trigger interaction if p5.js hasn't processed it
+            setTimeout(() => {
+              if (p.touches.length === 0) {
+                handleInteraction(x, y);
+              }
+            }, 10);
+          }
+        }, { passive: false, capture: true });
+
+        canvasElement.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, { passive: false });
+
+        canvasElement.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, { passive: false });
+        
+        p.frameRate(60);
+
+        console.log("Canvas initialized:", { width: p.width, height: p.height });
+
+        // Validate canvas before creating initial ring
+        if (p.width > 0 && p.height > 0) {
+          const centerX = p.width / 2;
+          const centerY = p.height / 2;
+          const position = calculateRingPosition(0, centerX, centerY);
+      const r = new Ring(position.x, position.y, 120, "circle");
+      r.bpm = 120;
+      r.setNodeCount(4);
+          rings.push(r);
+          refreshRingSelect();
+          loadRingIntoUI(0);
+          console.log("Initial ring created");
+        } else {
+          console.error("Canvas dimensions invalid, cannot create initial ring");
+        }
+      };
+
+      // Shared function for both mouse and touch interactions
+      const handleInteraction = (mx, my) => {
+        let best = { ringIdx: -1, nodeIdx: -1, dist: Infinity };
+        rings.forEach((r, rIdx) => {
+          const dx = mx - r.x;
+          const dy = my - r.y;
+          const distFromCenter = Math.hypot(dx, dy);
+          if (Math.abs(distFromCenter - r.radius) <= 20) {
+            r.nodes.forEach((node, nIdx) => {
+              const nx = r.x + Math.cos(node.angle) * r.radius;
+              const ny = r.y + Math.sin(node.angle) * r.radius;
+              const d = Math.hypot(mx - nx, my - ny);
+              if (d < best.dist) {
+                best = { ringIdx: rIdx, nodeIdx: nIdx, dist: d };
+              }
+            });
+          }
+        });
+        if (best.ringIdx !== -1 && best.dist <= 20) {
+          selectedRingIndex = best.ringIdx;
+          selectedNodeIndex = best.nodeIdx;
+          refreshRingSelect();
+          loadRingIntoUI(selectedRingIndex);
+        }
+      };
+
+      p.mousePressed = () => {
+        handleInteraction(p.mouseX, p.mouseY);
+      };
+
+      // Touch event handler for iPad/iPhone
+      p.touchStarted = () => {
+        if (p.touches.length > 0) {
+          // p5.js automatically sets mouseX/mouseY from touch events
+          handleInteraction(p.mouseX, p.mouseY);
+        }
+        return false; // prevent default
+      };
+
+      p.windowResized = () => {
+        const newWidth = Math.max(window.innerWidth - 280, 400);
+        const newHeight = Math.max(window.innerHeight, 300);
+        p.resizeCanvas(newWidth, newHeight);
+        console.log("Canvas resized:", { width: p.width, height: p.height });
+        const cx = p.width / 2;
+        const cy = p.height / 2;
+        rings.forEach((r, i) => {
+          const pos = calculateRingPosition(i, cx, cy);
+          r.x = pos.x;
+          r.y = pos.y;
+        });
+      };
+
+      p.draw = () => {
+        p.background(17);
+
+        // update & draw rings
+        const dt = p.deltaTime / 1000;
+        rings.forEach((ring) => {
+          ring.update(dt);
+          ring.checkTriggers();
+          ring.draw(p);
+        });
+      };
+
+      p5instance = p;
+    });
+
+    // -----------------------
+    // UI HANDLERS
+    // -----------------------
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const addRingBtn = document.getElementById("addRingBtn");
+    const removeRingBtn = document.getElementById("removeRingBtn");
+    const ringSelect = document.getElementById("ringSelect");
+    const audioUnlockOverlay = document.getElementById("audioUnlockOverlay");
+    const ringTypeSelect = document.getElementById("ringTypeSelect");
+    const speedRange = document.getElementById("speedRange");
+    const bpmInput = document.getElementById("bpmInput");
+    const nodeCountInput = document.getElementById("nodeCountInput");
+    const instrumentSelect = document.getElementById("instrumentSelect");
+    const nodeControlsDiv = document.getElementById("nodeControls");
+    const syncBtn = document.getElementById("syncBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const exportBtn = document.getElementById("exportBtn");
+    const rootNoteSelect = document.getElementById("rootNoteSelect");
+    const scaleSelect = document.getElementById("scaleSelect");
+    let selectedNodeIndex = -1; // focused node within the selected ring
+    let recentColors = [];
+    let recorder = null;
+    let isExporting = false;
+
+    async function unlockAudio() {
+      if (hasTone) {
+        try {
+          await Tone.start();
+          console.log("Audio unlocked");
+        } catch (e) {
+          console.warn("Error unlocking audio:", e);
+        }
+      }
+      if (audioUnlockOverlay) {
+        audioUnlockOverlay.classList.add("hidden");
+      }
+    }
+
+    if (audioUnlockOverlay) {
+      audioUnlockOverlay.addEventListener("click", unlockAudio, { once: true });
+      audioUnlockOverlay.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        unlockAudio();
+      }, { once: true, passive: false });
+    }
+
+    // iOS Safari fix: Add explicit touch handlers for all buttons
+    function addIOSButtonSupport(button) {
+      if (!button) return;
+      
+      // Ensure button is interactive
+      button.style.pointerEvents = 'auto';
+      button.style.touchAction = 'manipulation';
+      button.style.webkitTapHighlightColor = 'transparent';
+      
+      // For iOS, ensure touch events trigger clicks properly
+      let touchStartTime = 0;
+      let touchStarted = false;
+      
+      button.addEventListener('touchstart', function(e) {
+        touchStarted = true;
+        touchStartTime = Date.now();
+        // Don't prevent default - let the natural click happen if possible
+      }, { passive: true });
+      
+      button.addEventListener('touchend', function(e) {
+        if (touchStarted) {
+          const touchDuration = Date.now() - touchStartTime;
+          touchStarted = false;
+          
+          // Only trigger click if it was a quick tap (not a long press)
+          if (touchDuration < 500) {
+            // Prevent the default touch behavior
+            e.preventDefault();
+            
+            // Use requestAnimationFrame to ensure this happens after any default behavior
+            requestAnimationFrame(() => {
+              // Try native click() first - this is most reliable
+              try {
+                button.click();
+              } catch (err) {
+                // Fallback: dispatch a click event manually
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                  detail: 1,
+                  buttons: 1
+                });
+                button.dispatchEvent(clickEvent);
+              }
+            });
+          }
+        }
+      }, { passive: false }); // Not passive so we can preventDefault
+    }
+
+    // iOS button support will be applied after all click handlers are registered
+    // (See end of script)
+
+    // iOS fix for select elements
+    const allSelects = [rootNoteSelect, scaleSelect, ringSelect, ringTypeSelect, instrumentSelect];
+    allSelects.forEach(select => {
+      if (select) {
+        select.style.pointerEvents = 'auto';
+        select.style.touchAction = 'manipulation';
+        // Ensure selects work on iOS
+        select.addEventListener('touchstart', function(e) {
+          // Allow default for native select dropdown
+        }, { passive: true });
+      }
+    });
+
+    playPauseBtn.addEventListener("click", async () => {
+      // must start Tone context on user gesture
+      await Tone.start();
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        Tone.Transport.start();
+        playPauseBtn.textContent = "Pause";
+      } else {
+        Tone.Transport.pause();
+        playPauseBtn.textContent = "Start Audio / Play";
+      }
+    });
+
+    // BPM input handler (per-ring)
+    bpmInput.addEventListener("change", () => {
+      let bpm = parseFloat(bpmInput.value);
+      if (isNaN(bpm)) bpm = 120;
+      bpm = Math.max(20, Math.min(300, bpm));
+      bpmInput.value = bpm;
+      speedRange.value = bpm;
+      if (selectedRingIndex >= 0 && selectedRingIndex < rings.length) {
+        rings[selectedRingIndex].bpm = bpm;
+      }
+    });
+
+    addRingBtn.addEventListener("click", () => {
+      // Check max rings limit
+      if (rings.length >= maxRings) {
+        alert(`Maximum of ${maxRings} rings allowed. Remove a ring first.`);
+        console.warn(`Cannot add ring: maximum of ${maxRings} rings reached`);
+        return;
+      }
+
+      // Validate p5instance exists
+      if (!p5instance) {
+        alert("Canvas not initialized yet. Please wait a moment and try again.");
+        console.error("Cannot add ring: p5instance is not defined");
+        return;
+      }
+
+      const p = p5instance;
+      
+      // Validate canvas dimensions
+      const canvasWidth = p.width || (window.innerWidth - 280);
+      const canvasHeight = p.height || window.innerHeight;
+      
+      if (canvasWidth <= 0 || canvasHeight <= 0 || !isFinite(canvasWidth) || !isFinite(canvasHeight)) {
+        alert("Canvas dimensions are invalid. Please refresh the page.");
+        console.error("Cannot add ring: invalid canvas dimensions", { width: canvasWidth, height: canvasHeight });
+        return;
+      }
+
+      try {
+        // Calculate position using predetermined pattern
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        const position = calculateRingPosition(rings.length, centerX, centerY);
+        
+        const r = new Ring(
+          position.x,
+          position.y,
+          110,
+          "circle"
+        );
+        r.bpm = 120;
+        r.setNodeCount(4);
+        rings.push(r);
+        selectedRingIndex = rings.length - 1;
+        refreshRingSelect();
+        loadRingIntoUI(selectedRingIndex);
+        console.log(`Ring added successfully. Total rings: ${rings.length}`);
+      } catch (error) {
+        alert(`Error adding ring: ${error.message}`);
+        console.error("Error creating ring:", error);
+      }
+    });
+
+    removeRingBtn.addEventListener("click", () => {
+      if (rings.length <= 1) {
+        alert("Cannot remove the last ring. At least one ring is required.");
+        console.warn("Cannot remove ring: only one ring remaining");
+        return;
+      }
+      
+      if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) {
+        alert("Invalid ring selected.");
+        console.error("Invalid ring index:", selectedRingIndex);
+        return;
+      }
+      
+      rings.splice(selectedRingIndex, 1);
+      selectedRingIndex = Math.max(0, selectedRingIndex - 1);
+      refreshRingSelect();
+      loadRingIntoUI(selectedRingIndex);
+      console.log(`Ring removed. Remaining rings: ${rings.length}`);
+    });
+
+    ringSelect.addEventListener("change", () => {
+      selectedRingIndex = parseInt(ringSelect.value, 10);
+      if (selectedRingIndex >= 0 && selectedRingIndex < rings.length) {
+        loadRingIntoUI(selectedRingIndex);
+      } else {
+        console.error("Invalid ring index selected:", selectedRingIndex);
+      }
+    });
+
+    ringTypeSelect.addEventListener("change", () => {
+      if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) {
+        console.error("Cannot update ring type: invalid index", selectedRingIndex);
+        return;
+      }
+      const ring = rings[selectedRingIndex];
+      if (ring) {
+        ring.type = ringTypeSelect.value;
+        console.log(`Ring ${selectedRingIndex + 1} type changed to ${ringTypeSelect.value}`);
+      }
+    });
+
+    // Slider controls BPM (per-ring)
+    speedRange.addEventListener("input", () => {
+      let bpm = parseFloat(speedRange.value);
+      if (isNaN(bpm)) bpm = 120;
+      bpm = Math.max(20, Math.min(300, bpm));
+      bpmInput.value = bpm;
+      if (selectedRingIndex >= 0 && selectedRingIndex < rings.length) {
+        rings[selectedRingIndex].bpm = bpm;
+      }
+    });
+
+    nodeCountInput.addEventListener("change", () => {
+      if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) {
+        console.error("Cannot update node count: invalid index", selectedRingIndex);
+        return;
+      }
+      const ring = rings[selectedRingIndex];
+      if (ring) {
+        let val = parseInt(nodeCountInput.value, 10);
+        if (isNaN(val)) {
+          val = 4;
+          nodeCountInput.value = val;
+        }
+        val = Math.min(16, Math.max(1, val));
+        ring.setNodeCount(val);
+        nodeCountInput.value = val;
+        rebuildNodeControls();
+        console.log(`Ring ${selectedRingIndex + 1} node count set to ${val}`);
+      }
+    });
+
+    instrumentSelect.addEventListener("change", () => {
+      if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) {
+        console.error("Cannot update instrument: invalid index", selectedRingIndex);
+        return;
+      }
+      const ring = rings[selectedRingIndex];
+      if (ring) {
+        ring.setInstrument(instrumentSelect.value);
+        console.log(`Ring ${selectedRingIndex + 1} instrument changed to ${instrumentSelect.value}`);
+      }
+    });
+
+    // Timing controls
+    syncBtn.addEventListener("click", () => {
+      rings.forEach(r => {
+        r.rotation = 0;
+        r.nodes.forEach(n => { n.passedTrigger = false; n.justTriggered = false; n.pulseRemaining = 0; });
+      });
+      try { Tone.Transport.seconds = 0; } catch (_) {}
+    });
+
+    resetBtn.addEventListener("click", () => {
+      // Reset rings to a single default ring
+      rings = [];
+      const p = p5instance;
+      const centerX = p.width / 2;
+      const centerY = p.height / 2;
+      const r = new Ring(centerX, centerY, 120, "circle");
+      r.setNodeCount(4);
+      // Set default notes from current scale
+      if (availableScaleNotes.length > 0) {
+        r.nodes.forEach((node, idx) => {
+          node.note = availableScaleNotes[idx % availableScaleNotes.length];
+        });
+      }
+      rings.push(r);
+      selectedRingIndex = 0;
+      recentColors = [];
+      currentBpm = 120; bpmInput.value = 120; speedRange.value = 120;
+      try { Tone.Transport.bpm.value = 120; Tone.Transport.seconds = 0; } catch (_) {}
+      refreshRingSelect();
+      loadRingIntoUI(0);
+    });
+
+    // Scale change handlers
+    function updateScale() {
+      currentRootNote = rootNoteSelect.value;
+      currentScaleType = scaleSelect.value;
+      availableScaleNotes = generateScaleNotes(currentRootNote, currentScaleType);
+      
+      // Update all existing nodes: keep notes that are in the new scale, otherwise find closest
+      rings.forEach(ring => {
+        ring.nodes.forEach((node) => {
+          const currentNote = node.note;
+          if (!availableScaleNotes.includes(currentNote)) {
+            // Find closest note in new scale
+            const currentOctave = parseInt(currentNote.match(/\d+/)?.[0] || 4);
+            const currentNoteName = currentNote.replace(/\d+/, '');
+            const currentSemitone = getRootSemitone(currentNoteName) + (currentOctave * 12);
+            
+            let closestNote = availableScaleNotes[0];
+            let minDistance = Infinity;
+            availableScaleNotes.forEach(scaleNote => {
+              const scaleOctave = parseInt(scaleNote.match(/\d+/)?.[0] || 4);
+              const scaleNoteName = scaleNote.replace(/\d+/, '');
+              const scaleSemitone = getRootSemitone(scaleNoteName) + (scaleOctave * 12);
+              const distance = Math.abs(scaleSemitone - currentSemitone);
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestNote = scaleNote;
+              }
+            });
+            node.note = closestNote;
+          }
+          // If note is already in scale, keep it as is
+        });
+      });
+      
+      // Rebuild node controls to show updated scale notes
+      if (selectedRingIndex >= 0 && selectedRingIndex < rings.length) {
+        rebuildNodeControls();
+      }
+    }
+
+    rootNoteSelect.addEventListener("change", updateScale);
+    scaleSelect.addEventListener("change", updateScale);
+
+    // Apply iOS button support AFTER all click handlers are registered
+    // This ensures touch events properly trigger the existing click handlers
+    const allButtons = [playPauseBtn, addRingBtn, removeRingBtn, syncBtn, resetBtn, exportBtn];
+    allButtons.forEach(addIOSButtonSupport);
+
+    // Export 4-bar loop as WAV
+    exportBtn.addEventListener("click", async () => {
+      if (!hasTone) {
+        alert("Tone.js is not available. Cannot export audio.");
+        return;
+      }
+
+      if (rings.length === 0) {
+        alert("No rings to export. Add at least one ring first.");
+        return;
+      }
+
+      if (isExporting) {
+        return; // Prevent multiple simultaneous exports
+      }
+
+      isExporting = true;
+      exportBtn.textContent = "Exporting...";
+      exportBtn.disabled = true;
+
+      try {
+        // Ensure Tone context is started
+        await Tone.start();
+
+        // Get reference BPM (use first ring's BPM or default to 120)
+        const referenceBpm = rings.length > 0 ? (rings[0].bpm || 120) : 120;
+        
+        // Calculate 4 bars duration: 4 bars = 4 beats
+        // Duration in seconds = (4 beats * 60 seconds) / BPM
+        const durationSeconds = (4 * 60) / referenceBpm;
+
+        // Create a master gain node and recorder
+        const masterGain = new Tone.Gain(1);
+        recorder = new Tone.Recorder();
+        
+        // Connect master gain to both destination (for playback) and recorder (for recording)
+        masterGain.toDestination();
+        masterGain.connect(recorder);
+
+        // Store original connections and reconnect instruments through master gain
+        const originalConnections = [];
+        rings.forEach(ring => {
+          if (ring.instrument) {
+            try {
+              // Disconnect from current destination
+              ring.instrument.disconnect();
+              // Connect to master gain instead
+              ring.instrument.connect(masterGain);
+              originalConnections.push(ring.instrument);
+            } catch (e) {
+              console.warn("Could not reconnect instrument:", e);
+            }
+          }
+        });
+
+        // Reset all rings to start position for clean loop
+        rings.forEach(r => {
+          r.rotation = 0;
+          r.lastRotation = 0;
+          r.nodes.forEach(n => {
+            n.passedTrigger = false;
+            n.justTriggered = false;
+            n.pulseRemaining = 0;
+          });
+        });
+
+        // Start recording
+        await recorder.start();
+
+        // Play the loop for the calculated duration
+        const wasPlaying = isPlaying;
+        if (!isPlaying) {
+          isPlaying = true;
+          Tone.Transport.start();
+        }
+
+        // Wait for the duration (add small buffer for safety)
+        await new Promise(resolve => setTimeout(resolve, (durationSeconds * 1000) + 200));
+
+        // Stop recording
+        const recording = await recorder.stop();
+
+        // Restore original connections - reconnect instruments to destination
+        originalConnections.forEach(instrument => {
+          try {
+            instrument.disconnect();
+            instrument.toDestination();
+          } catch (e) {
+            console.warn("Could not restore instrument connection:", e);
+          }
+        });
+
+        // Clean up
+        masterGain.disconnect();
+        recorder.dispose();
+        recorder = null;
+
+        // Restore playback state
+        if (!wasPlaying) {
+          isPlaying = false;
+          Tone.Transport.pause();
+        }
+
+        // Download the file
+        const url = URL.createObjectURL(recording);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `geomusic-4bar-${Date.now()}.wav`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+
+        exportBtn.textContent = "Export 4-Bar Loop";
+        exportBtn.disabled = false;
+        isExporting = false;
+
+      } catch (error) {
+        console.error("Export error:", error);
+        alert(`Export failed: ${error.message}`);
+        exportBtn.textContent = "Export 4-Bar Loop";
+        exportBtn.disabled = false;
+        isExporting = false;
+
+        // Clean up on error
+        if (recorder) {
+          try {
+            await recorder.stop();
+            recorder.dispose();
+          } catch (e) {
+            console.warn("Error cleaning up recorder:", e);
+          }
+          recorder = null;
+        }
+
+        // Try to restore connections on error
+        rings.forEach(ring => {
+          if (ring.instrument) {
+            try {
+              ring.instrument.disconnect();
+              ring.instrument.toDestination();
+            } catch (e) {
+              console.warn("Error restoring instrument:", e);
+            }
+          }
+        });
+      }
+    });
+
+    function refreshRingSelect() {
+      if (!ringSelect) {
+        console.error("ringSelect element not found");
+        return;
+      }
+      ringSelect.innerHTML = "";
+      rings.forEach((_, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = "Ring " + (idx + 1);
+        ringSelect.appendChild(opt);
+      });
+      // Validate selectedRingIndex before setting
+      if (selectedRingIndex >= 0 && selectedRingIndex < rings.length) {
+        ringSelect.value = selectedRingIndex;
+      } else if (rings.length > 0) {
+        selectedRingIndex = 0;
+        ringSelect.value = 0;
+      }
+    }
+
+    function loadRingIntoUI(index) {
+      if (index < 0 || index >= rings.length) {
+        console.error("Cannot load ring into UI: invalid index", index);
+        return;
+      }
+      const ring = rings[index];
+      if (!ring) {
+        console.error("Ring at index", index, "does not exist");
+        return;
+      }
+      ringTypeSelect.value = ring.type;
+      speedRange.value = ring.bpm || 120;
+      bpmInput.value = ring.bpm || 120;
+      nodeCountInput.value = ring.nodes.length;
+      instrumentSelect.value = ring.instrumentType;
+      selectedNodeIndex = -1;
+      rebuildNodeControls();
+    }
+
+    // build per-node note dropdowns
+    function rebuildNodeControls() {
+      if (!nodeControlsDiv) {
+        console.error("nodeControlsDiv element not found");
+        return;
+      }
+      nodeControlsDiv.innerHTML = "";
+      
+      if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) {
+        console.error("Cannot rebuild node controls: invalid ring index", selectedRingIndex);
+        return;
+      }
+      
+      const ring = rings[selectedRingIndex];
+      if (!ring || !ring.nodes) {
+        console.error("Ring or ring.nodes is invalid");
+        return;
+      }
+      
+      ring.nodes.forEach((node, idx) => {
+        const row = document.createElement("div");
+        row.className = "node-row";
+
+        const label = document.createElement("label");
+        label.textContent = "Node " + (idx + 1);
+        label.style.cursor = 'pointer';
+        label.addEventListener('click', () => { selectedNodeIndex = idx; highlightSelectedNodeRow(); });
+        row.appendChild(label);
+
+        const sel = document.createElement("select");
+        // Only show notes in the current scale
+        availableScaleNotes.forEach(n => {
+          const opt = document.createElement("option");
+          opt.value = n;
+          opt.textContent = n;
+          sel.appendChild(opt);
+        });
+        
+        // Set current note, or find closest note in scale if current note is not in scale
+        let currentNote = node.note || defaultScale[idx % defaultScale.length];
+        if (!availableScaleNotes.includes(currentNote)) {
+          // Find closest note in scale (by semitone)
+          const currentOctave = parseInt(currentNote.match(/\d+/)?.[0] || 4);
+          const currentNoteName = currentNote.replace(/\d+/, '');
+          const currentSemitone = getRootSemitone(currentNoteName) + (currentOctave * 12);
+          
+          let closestNote = availableScaleNotes[0];
+          let minDistance = Infinity;
+          availableScaleNotes.forEach(scaleNote => {
+            const scaleOctave = parseInt(scaleNote.match(/\d+/)?.[0] || 4);
+            const scaleNoteName = scaleNote.replace(/\d+/, '');
+            const scaleSemitone = getRootSemitone(scaleNoteName) + (scaleOctave * 12);
+            const distance = Math.abs(scaleSemitone - currentSemitone);
+            if (distance < minDistance) {
+              minDistance = distance;
+              closestNote = scaleNote;
+            }
+          });
+          currentNote = closestNote;
+          node.note = currentNote; // Update node to use scale note
+        }
+        
+        sel.value = currentNote;
+        sel.addEventListener("change", () => {
+          node.note = sel.value;
+        });
+        row.appendChild(sel);
+
+        const color = document.createElement('input');
+        color.type = 'color';
+        color.value = node.color || themeColor;
+        color.addEventListener('input', () => {
+          node.setColor(color.value);
+          addRecentColor(node.color);
+        });
+        row.appendChild(color);
+
+        nodeControlsDiv.appendChild(row);
+      });
+
+      // recent colors palette
+      if (recentColors.length > 0) {
+        const paletteLabel = document.createElement('label');
+        paletteLabel.textContent = 'Recent Colors';
+        nodeControlsDiv.appendChild(paletteLabel);
+        const paletteRow = document.createElement('div');
+        paletteRow.className = 'row';
+        recentColors.forEach(col => {
+          const sw = document.createElement('button');
+          sw.style.height = '44px';
+          sw.style.minWidth = '44px';
+          sw.style.border = '1px solid #333';
+          sw.style.background = col;
+          sw.title = col;
+          sw.style.touchAction = 'manipulation';
+          sw.addEventListener('click', () => {
+            if (selectedRingIndex < 0 || selectedRingIndex >= rings.length) return;
+            if (selectedNodeIndex < 0) return;
+            rings[selectedRingIndex].nodes[selectedNodeIndex].setColor(col);
+            rebuildNodeControls();
+          });
+          paletteRow.appendChild(sw);
+        });
+        nodeControlsDiv.appendChild(paletteRow);
+      }
+
+      function highlightSelectedNodeRow() {
+        const rows = nodeControlsDiv.querySelectorAll('.node-row');
+        rows.forEach((r, i) => {
+          r.style.border = (i === selectedNodeIndex) ? '1px solid ' + themeColor : '1px solid transparent';
+          r.style.borderRadius = '4px';
+          r.style.padding = '2px';
+        });
+      }
+      // ensure initial highlight
+      highlightSelectedNodeRow();
+    }
+
+    function addRecentColor(col) {
+      if (!col) return;
+      if (!recentColors.includes(col)) {
+        recentColors.unshift(col);
+        if (recentColors.length > 8) recentColors.pop();
+        // refresh to show updated palette
+        rebuildNodeControls();
+      }
+    }
+
+    // -----------------------
+    // HOW TO RUN (for you):
+    // 1. Save this as index.html
+    // 2. Open in browser or use Live Server (VSCode/Cursor)
+    // 3. Click "Start Audio / Play" once to unlock sound
+    // 4. Add rings, pick notes, change speed
+    // -----------------------
+  </script>
+</body>
+</html>
